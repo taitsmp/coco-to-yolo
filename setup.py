@@ -1,3 +1,5 @@
+from setuptools import setup, find_packages  # Make sure both are imported
+
 setup(
     name="coco-to-yolo",  # Changed from coco-yolo-tools to match repo name
     version="0.1.0",
