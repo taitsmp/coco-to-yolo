@@ -36,16 +36,6 @@ def process_split(
 ) -> Optional[Dict]:
     """
     Process a single data split (train/val/test)
-    
-    Args:
-        coco_file: Path to COCO format annotation file
-        output_dir: Base output directory
-        split_name: Name of the split (train/val/test)
-        source_dir: Directory containing source images
-        include_empty: Whether to include images with no annotations
-        
-    Returns:
-        category information for yaml file
     """
     if not coco_file.exists():
         print(f"Skipping {split_name} split - file not found: {coco_file}")
@@ -53,15 +43,20 @@ def process_split(
     
     print(f"\nProcessing {split_name} split...")
     
+    # Load COCO annotations
+    with open(coco_file, 'r') as f:
+        coco_data = json.load(f)
+    
     # Create output directories
     images_dir = output_dir / 'images' / split_name
     labels_dir = output_dir / 'labels' / split_name
     images_dir.mkdir(parents=True, exist_ok=True)
     labels_dir.mkdir(parents=True, exist_ok=True)
     
-    # Load COCO annotations
-    with open(coco_file, 'r') as f:
-        coco_data = json.load(f)
+    # Track statistics
+    total_images = len(coco_data['images'])
+    processed_images = 0
+    skipped_images = 0
     
     # Create image id to info mapping
     image_info = {img['id']: img for img in coco_data['images']}
@@ -81,6 +76,7 @@ def process_split(
         source_path = source_dir / img_filename
         if not source_path.exists():
             print(f"Warning: Source image not found: {source_path}")
+            skipped_images += 1
             continue
             
         dest_path = images_dir / source_path.name
@@ -102,8 +98,15 @@ def process_split(
         elif include_empty:
             # Create empty label file for images with no annotations
             label_path.touch()
+        
+        processed_images += 1
     
-    print(f"Processed {len(image_info)} images for {split_name} split")
+    print(f"Split: {split_name}")
+    print(f"  Total images in annotations: {total_images}")
+    print(f"  Successfully processed: {processed_images}")
+    if skipped_images > 0:
+        print(f"  Skipped (images not found): {skipped_images}")
+    
     return coco_data['categories']
 
 def create_yaml_file(output_dir: Path, categories: List[Dict], splits: List[str]):
@@ -140,40 +143,48 @@ def main():
     # If images_dir is not specified, use input_dir
     image_base_dir = args.images_dir if args.images_dir else args.input_dir
     
+    print(f"\nInput directory: {args.input_dir}")
+    print(f"Output directory: {args.output_dir}")
+    print(f"Images directory: {image_base_dir}")
+    
     # Verify input files exist
     train_file = args.input_dir / 'train.json'
     val_file = args.input_dir / 'val.json'
     test_file = args.input_dir / 'test.json'
     
-    if not train_file.exists() and not val_file.exists():
-        print("Error: Neither train.json nor val.json found in input directory")
+    found_splits = []
+    if train_file.exists():
+        found_splits.append(('train', train_file))
+    if val_file.exists():
+        found_splits.append(('val', val_file))
+    if test_file.exists():
+        found_splits.append(('test', test_file))
+    
+    if not found_splits:
+        print("Error: No split files (train.json, val.json, test.json) found in input directory")
         return
+    
+    print(f"\nFound split files: {[split[0] for split in found_splits]}")
     
     # Create output directory
     args.output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Process each split with include_empty parameter
+    # Process each split
     splits = []
     categories = None
     
-    if train_file.exists():
-        splits.append('train')
-        categories = process_split(train_file, args.output_dir, 'train', image_base_dir, 
-                                 include_empty=args.include_empty)
+    for split_name, split_file in found_splits:
+        splits.append(split_name)
+        split_categories = process_split(
+            split_file, 
+            args.output_dir, 
+            split_name, 
+            image_base_dir,
+            include_empty=args.include_empty
+        )
+        if not categories and split_categories:
+            categories = split_categories
     
-    if val_file.exists():
-        splits.append('val')
-        if not categories:
-            categories = process_split(val_file, args.output_dir, 'val', image_base_dir, 
-                                       include_empty=args.include_empty)
-    
-    if test_file.exists():
-        splits.append('test')
-        if not categories:
-            categories = process_split(test_file, args.output_dir, 'test', image_base_dir, 
-                                       include_empty=args.include_empty)
-    
-    # Create data.yaml file only if flag is set
     if args.include_data_yaml and categories:
         create_yaml_file(args.output_dir, categories, splits)
     
