@@ -6,7 +6,6 @@ setup(
     packages=find_packages(),
     scripts=[
         'bin/coco_to_yolo.py',
-        'bin/filter_coco.py'  # Add this if you want the filter script too
     ],
     install_requires=[
         "PyYAML>=5.1",
