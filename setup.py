@@ -1,7 +1,7 @@
-from setuptools import setup, find_packages  # Make sure both are imported
+from setuptools import setup, find_packages
 
 setup(
-    name="coco-to-yolo",  # Changed from coco-yolo-tools to match repo name
+    name="coco-to-yolo",
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
@@ -9,8 +9,8 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'coco-to-yolo=coco-to-yolo.coco_to_yolo:main',
-            'filter-coco=coco-to-yolo.filter_coco_annotations:main',
+            'coco-to-yolo=coco_to_yolo.coco_to_yolo:main',  # Changed hyphen to underscore
+            'filter-coco=coco_to_yolo.filter_coco_annotations:main',  # Changed hyphen to underscore
         ],
     },
     author="Tait Larson",
@@ -18,7 +18,7 @@ setup(
     description="Tools for working with COCO and YOLO format datasets",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/taitsmp/coco-to-yolo",  # Changed to match actual repo URL
+    url="https://github.com/taitsmp/coco-to-yolo",
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
