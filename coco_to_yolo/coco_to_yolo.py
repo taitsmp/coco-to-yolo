@@ -94,7 +94,9 @@ def process_split(
                         img_data['width'],
                         img_data['height']
                     )
-                    f.write(f"{ann['category_id']} {' '.join(map(str, bbox))}\n")
+                    # Convert 1-based COCO category ID to 0-based YOLO class ID
+                    class_id = ann['category_id'] - 1
+                    f.write(f"{class_id} {' '.join(map(str, bbox))}\n")
         elif include_empty:
             # Create empty label file for images with no annotations
             label_path.touch()
@@ -111,11 +113,14 @@ def process_split(
 
 def create_yaml_file(output_dir: Path, categories: List[Dict], splits: List[str]):
     """Create data.yaml file for ultralytics YOLOv8"""
+    # Convert 1-based COCO category IDs to 0-based YOLO class indices
+    names = [cat['name'] for cat in sorted(categories, key=lambda x: x['id'])]
+    
     yaml_data = {
         'path': str(output_dir.absolute()),
         'train': 'train',
         'val': 'val',
-        'names': {cat['id']: cat['name'] for cat in categories}
+        'names': names  # YOLO expects a list of names, indexed from 0
     }
     
     if 'test' in splits:
