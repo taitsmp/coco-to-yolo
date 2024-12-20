@@ -9,8 +9,8 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'coco-to-yolo=coco_yolo_tools.coco_to_yolo:main',
-            'filter-coco=coco_yolo_tools.filter_coco_annotations:main',
+            'coco-to-yolo=coco-to-yolo.coco_to_yolo:main',
+            'filter-coco=coco-to-yolo.filter_coco_annotations:main',
         ],
     },
     author="Tait Larson",
