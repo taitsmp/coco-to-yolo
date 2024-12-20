@@ -1,7 +1,5 @@
-from setuptools import setup, find_packages
-
 setup(
-    name="coco-yolo-tools",
+    name="coco-to-yolo",  # Changed from coco-yolo-tools to match repo name
     version="0.1.0",
     packages=find_packages(),
     install_requires=[
@@ -18,7 +16,7 @@ setup(
     description="Tools for working with COCO and YOLO format datasets",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/taitsmp/coco-yolo-tools",
+    url="https://github.com/taitsmp/coco-to-yolo",  # Changed to match actual repo URL
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
