@@ -2,11 +2,13 @@ from setuptools import setup, find_packages
 
 setup(
     name="coco-to-yolo",
-    version="0.1.2",
+    version="0.1.3",
     packages=find_packages(),
-    scripts=[
-        'bin/coco_to_yolo.py',
-    ],
+    entry_points={
+        'console_scripts': [
+            'coco_to_yolo=coco_to_yolo.coco_to_yolo:main',
+        ],
+    },
     install_requires=[
         "PyYAML>=5.1",
     ],
