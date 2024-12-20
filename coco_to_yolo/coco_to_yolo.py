@@ -132,8 +132,13 @@ def main():
                       help='Include images with no annotations by creating empty label files (default: False)')
     parser.add_argument('--include-data-yaml', action='store_true', default=False,
                       help='Generate data.yaml file for YOLOv8 training (default: False)')
+    parser.add_argument('--images-dir', type=Path,
+                      help='Base directory for images. Will be prepended to image paths from COCO json')
     
     args = parser.parse_args()
+    
+    # If images_dir is not specified, use input_dir
+    image_base_dir = args.images_dir if args.images_dir else args.input_dir
     
     # Verify input files exist
     train_file = args.input_dir / 'train.json'
@@ -153,19 +158,19 @@ def main():
     
     if train_file.exists():
         splits.append('train')
-        categories = process_split(train_file, args.output_dir, 'train', args.input_dir, 
+        categories = process_split(train_file, args.output_dir, 'train', image_base_dir, 
                                  include_empty=args.include_empty)
     
     if val_file.exists():
         splits.append('val')
         if not categories:
-            categories = process_split(val_file, args.output_dir, 'val', args.input_dir, 
+            categories = process_split(val_file, args.output_dir, 'val', image_base_dir, 
                                        include_empty=args.include_empty)
     
     if test_file.exists():
         splits.append('test')
         if not categories:
-            categories = process_split(test_file, args.output_dir, 'test', args.input_dir, 
+            categories = process_split(test_file, args.output_dir, 'test', image_base_dir, 
                                        include_empty=args.include_empty)
     
     # Create data.yaml file only if flag is set
