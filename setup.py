@@ -4,15 +4,13 @@ setup(
     name="coco-to-yolo",
     version="0.1.0",
     packages=find_packages(),
+    scripts=[
+        'bin/coco_to_yolo.py',
+        'bin/filter_coco.py'  # Add this if you want the filter script too
+    ],
     install_requires=[
         "PyYAML>=5.1",
     ],
-    entry_points={
-        'console_scripts': [
-            'coco-to-yolo=coco_to_yolo.coco_to_yolo:main',  # Changed hyphen to underscore
-            'filter-coco=coco_to_yolo.filter_coco_annotations:main',  # Changed hyphen to underscore
-        ],
-    },
     author="Tait Larson",
     author_email="telarson@gmail.com",
     description="Tools for working with COCO and YOLO format datasets",
