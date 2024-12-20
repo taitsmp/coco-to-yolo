@@ -9,5 +9,4 @@ __all__ = [
     "convert_bbox_coco_to_yolo",
     "process_split",
     "create_yaml_file",
-    "filter_coco_annotations"
 ]
