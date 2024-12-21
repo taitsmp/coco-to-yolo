@@ -61,6 +61,10 @@ def process_split(
     # Create image id to info mapping
     image_info = {img['id']: img for img in coco_data['images']}
     
+    # Create mapping of category IDs to sequential zero-based indices
+    categories = sorted(coco_data['categories'], key=lambda x: x['id'])
+    category_id_to_index = {cat['id']: idx for idx, cat in enumerate(categories)}
+    
     # Group annotations by image
     image_annotations = {}
     for ann in coco_data['annotations']:
@@ -94,8 +98,8 @@ def process_split(
                         img_data['width'],
                         img_data['height']
                     )
-                    # Convert 1-based COCO category ID to 0-based YOLO class ID
-                    class_id = ann['category_id'] - 1
+                    # Convert category ID to zero-based index using the mapping
+                    class_id = category_id_to_index[ann['category_id']]
                     f.write(f"{class_id} {' '.join(map(str, bbox))}\n")
         elif include_empty:
             # Create empty label file for images with no annotations
@@ -109,7 +113,12 @@ def process_split(
     if skipped_images > 0:
         print(f"  Skipped (images not found): {skipped_images}")
     
-    return coco_data['categories']
+    # Print category ID mapping for user reference
+    print("\nCategory ID mapping (original -> YOLO):")
+    for cat in categories:
+        print(f"  {cat['name']}: {cat['id']} -> {category_id_to_index[cat['id']]}")
+    
+    return categories
 
 def create_yaml_file(output_dir: Path, categories: List[Dict], splits: List[str]):
     """Create data.yaml file for ultralytics YOLOv8"""
@@ -288,6 +297,16 @@ def main():
     
     print("\nConversion complete!")
     print(f"Dataset created at: {args.output_dir}")
+    
+    if categories:
+        print("\nFinal Class Mapping Summary:")
+        print("---------------------------")
+        print("YOLO ID | Original ID | Class Name")
+        print("---------------------------")
+        sorted_categories = sorted(categories, key=lambda x: x['id'])
+        for idx, cat in enumerate(sorted_categories):
+            print(f"{idx:7d} | {cat['id']:10d} | {cat['name']}")
+        print("---------------------------")
 
 if __name__ == '__main__':
     main()
