@@ -117,14 +117,14 @@ def create_yaml_file(output_dir: Path, categories: List[Dict], splits: List[str]
     names = [cat['name'] for cat in sorted(categories, key=lambda x: x['id'])]
     
     yaml_data = {
-        'path': str(output_dir.absolute()),
-        'train': 'train',
-        'val': 'val',
+        'path': '.',  # Use relative path instead of absolute
+        'train': 'images/train',  # Use full path to images
+        'val': 'images/val',
         'names': names  # YOLO expects a list of names, indexed from 0
     }
     
     if 'test' in splits:
-        yaml_data['test'] = 'test'
+        yaml_data['test'] = 'images/test'
     
     yaml_path = output_dir / 'data.yaml'
     with open(yaml_path, 'w') as f:
