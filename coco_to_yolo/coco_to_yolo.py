@@ -5,7 +5,7 @@ import json
 import shutil
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import yaml
 
 def convert_bbox_coco_to_yolo(bbox: List[float], img_width: int, img_height: int) -> List[float]:
@@ -32,10 +32,13 @@ def process_split(
     output_dir: Path,
     split_name: str,
     source_dir: Path,
+    dir_name: str,
+    category_id_to_index: Dict[int, int],
     include_empty: bool = True
-) -> Optional[Dict]:
+) -> Optional[List[Dict]]:
     """
     Process a single data split (train/val/test)
+    Uses a pre-computed global category_id_to_index mapping
     """
     if not coco_file.exists():
         print(f"Skipping {split_name} split - file not found: {coco_file}")
@@ -47,9 +50,9 @@ def process_split(
     with open(coco_file, 'r') as f:
         coco_data = json.load(f)
     
-    # Create output directories
-    images_dir = output_dir / 'images' / split_name
-    labels_dir = output_dir / 'labels' / split_name
+    # Create output directories using custom directory name
+    images_dir = output_dir / 'images' / dir_name
+    labels_dir = output_dir / 'labels' / dir_name
     images_dir.mkdir(parents=True, exist_ok=True)
     labels_dir.mkdir(parents=True, exist_ok=True)
     
@@ -60,10 +63,6 @@ def process_split(
     
     # Create image id to info mapping
     image_info = {img['id']: img for img in coco_data['images']}
-    
-    # Create mapping of category IDs to sequential zero-based indices
-    categories = sorted(coco_data['categories'], key=lambda x: x['id'])
-    category_id_to_index = {cat['id']: idx for idx, cat in enumerate(categories)}
     
     # Group annotations by image
     image_annotations = {}
@@ -115,25 +114,25 @@ def process_split(
     
     # Print category ID mapping for user reference
     print("\nCategory ID mapping (original -> YOLO):")
-    for cat in categories:
+    for cat in coco_data['categories']:
         print(f"  {cat['name']}: {cat['id']} -> {category_id_to_index[cat['id']]}")
     
-    return categories
+    return coco_data['categories']
 
-def create_yaml_file(output_dir: Path, categories: List[Dict], splits: List[str]):
+def create_yaml_file(output_dir: Path, categories: List[Dict], splits: List[str], train_dir: str, val_dir: str, test_dir: str):
     """Create data.yaml file for ultralytics YOLOv8"""
     # Convert 1-based COCO category IDs to 0-based YOLO class indices
     names = [cat['name'] for cat in sorted(categories, key=lambda x: x['id'])]
     
     yaml_data = {
         'path': '.',  # Use relative path instead of absolute
-        'train': 'images/train',  # Use full path to images
-        'val': 'images/val',
+        'train': f'images/{train_dir}',  # Use custom directory names
+        'val': f'images/{val_dir}',
         'names': names  # YOLO expects a list of names, indexed from 0
     }
     
     if 'test' in splits:
-        yaml_data['test'] = 'images/test'
+        yaml_data['test'] = f'images/{test_dir}'
     
     yaml_path = output_dir / 'data.yaml'
     with open(yaml_path, 'w') as f:
@@ -146,6 +145,7 @@ def process_classification_split(
     output_dir: Path,
     split_name: str,
     source_dir: Path,
+    dir_name: str,
 ) -> Optional[Dict]:
     """
     Process a single data split for classification data (train/val/test)
@@ -160,8 +160,8 @@ def process_classification_split(
     with open(coco_file, 'r') as f:
         coco_data = json.load(f)
     
-    # Create output directory for this split
-    split_dir = output_dir / split_name
+    # Create output directory for this split using custom directory name
+    split_dir = output_dir / dir_name
     split_dir.mkdir(parents=True, exist_ok=True)
     
     # Track statistics
@@ -220,6 +220,38 @@ def process_classification_split(
     
     return coco_data['categories']
 
+def create_global_category_mapping(found_splits: List[Tuple[str, Path]]) -> Tuple[List[Dict], Dict[int, int]]:
+    """Create a global mapping of category IDs to YOLO indices across all splits"""
+    # Collect all categories from all splits
+    all_categories = []
+    for _, split_file in found_splits:
+        if not split_file.exists():
+            continue
+        with open(split_file, 'r') as f:
+            coco_data = json.load(f)
+            all_categories.extend(coco_data['categories'])
+    
+    # Create name-based mapping to handle duplicates
+    name_to_index = {}
+    current_index = 0
+    for cat in all_categories:
+        if cat['name'] not in name_to_index:
+            name_to_index[cat['name']] = current_index
+            current_index += 1
+    
+    # Create mapping from original IDs to YOLO indices
+    category_id_to_index = {cat['id']: name_to_index[cat['name']] for cat in all_categories}
+    
+    # Get unique categories (by name) for YAML file
+    unique_categories = []
+    seen_names = set()
+    for cat in sorted(all_categories, key=lambda x: category_id_to_index[x['id']]):
+        if cat['name'] not in seen_names:
+            unique_categories.append(cat)
+            seen_names.add(cat['name'])
+    
+    return unique_categories, category_id_to_index
+
 def main():
     parser = argparse.ArgumentParser(description='Convert COCO format to YOLO format')
     parser.add_argument('input_dir', type=Path, help='Input directory containing COCO json files')
@@ -232,6 +264,12 @@ def main():
                       help='Base directory for images. Will be prepended to image paths from COCO json')
     parser.add_argument('--classification', action='store_true', default=False,
                       help='Process dataset for classification instead of object detection')
+    parser.add_argument('--train-dir-name', type=str, default='train',
+                      help='Name of the training directory (default: train)')
+    parser.add_argument('--val-dir-name', type=str, default='val',
+                      help='Name of the validation directory (default: val)')
+    parser.add_argument('--test-dir-name', type=str, default='test',
+                      help='Name of the test directory (default: test)')
     
     args = parser.parse_args()
     
@@ -268,18 +306,26 @@ def main():
     # Create output directory
     args.output_dir.mkdir(parents=True, exist_ok=True)
     
+    # Create global category mapping first
+    categories, category_id_to_index = create_global_category_mapping(found_splits)
+    
     # Process each split
     splits = []
-    categories = None
-    
     for split_name, split_file in found_splits:
         splits.append(split_name)
+        dir_name = {
+            'train': args.train_dir_name,
+            'val': args.val_dir_name,
+            'test': args.test_dir_name
+        }[split_name]
+        
         if args.classification:
             split_categories = process_classification_split(
                 split_file,
                 args.output_dir,
                 split_name,
-                image_base_dir
+                image_base_dir,
+                dir_name
             )
         else:
             split_categories = process_split(
@@ -287,13 +333,13 @@ def main():
                 args.output_dir,
                 split_name,
                 image_base_dir,
+                dir_name,
+                category_id_to_index,
                 include_empty=args.include_empty
             )
-        if not categories and split_categories:
-            categories = split_categories
     
     if args.include_data_yaml and categories and not args.classification:
-        create_yaml_file(args.output_dir, categories, splits)
+        create_yaml_file(args.output_dir, categories, splits, args.train_dir_name, args.val_dir_name, args.test_dir_name)
     
     print("\nConversion complete!")
     print(f"Dataset created at: {args.output_dir}")
@@ -303,9 +349,22 @@ def main():
         print("---------------------------")
         print("YOLO ID | Original ID | Class Name")
         print("---------------------------")
-        sorted_categories = sorted(categories, key=lambda x: x['id'])
-        for idx, cat in enumerate(sorted_categories):
-            print(f"{idx:7d} | {cat['id']:10d} | {cat['name']}")
+        # Create a mapping of YOLO index to all original IDs that map to it
+        index_to_originals = {}
+        for cat in categories:
+            yolo_idx = category_id_to_index[cat['id']]
+            if yolo_idx not in index_to_originals:
+                index_to_originals[yolo_idx] = []
+            index_to_originals[yolo_idx].append((cat['id'], cat['name']))
+        
+        # Print sorted by YOLO index
+        for yolo_idx in sorted(index_to_originals.keys()):
+            originals = index_to_originals[yolo_idx]
+            # Print first one normally
+            print(f"{yolo_idx:7d} | {originals[0][0]:10d} | {originals[0][1]}")
+            # Print any duplicates with same YOLO ID
+            for orig_id, name in originals[1:]:
+                print(f"{' ':7s} | {orig_id:10d} | {name} (duplicate)")
         print("---------------------------")
 
 if __name__ == '__main__':
