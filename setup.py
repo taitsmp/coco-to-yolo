@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="coco-to-yolo",
-    version="0.1.6",
+    version="0.1.7",
     packages=find_packages(),
     entry_points={
         'console_scripts': [
@@ -11,7 +11,15 @@ setup(
     },
     install_requires=[
         "PyYAML>=5.1",
+        "numpy",
+        "Pillow",
     ],
+    extras_require={
+        'test': [
+            'pytest',
+            'pytest-cov'
+        ],
+    },
     author="Tait Larson",
     author_email="telarson@gmail.com",
     description="Tools for working with COCO and YOLO format datasets",
