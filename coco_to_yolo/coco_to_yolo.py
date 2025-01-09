@@ -349,17 +349,23 @@ def main():
         print("---------------------------")
         print("YOLO ID | Original ID | Class Name")
         print("---------------------------")
+        
         # Create a mapping of YOLO index to all original IDs that map to it
         index_to_originals = {}
-        for cat in categories:
-            yolo_idx = category_id_to_index[cat['id']]
-            if yolo_idx not in index_to_originals:
-                index_to_originals[yolo_idx] = []
-            index_to_originals[yolo_idx].append((cat['id'], cat['name']))
+        
+        # Collect categories from all splits
+        for split_name, split_file in found_splits:
+            with open(split_file, 'r') as f:
+                split_data = json.load(f)
+                for cat in split_data['categories']:
+                    yolo_idx = category_id_to_index[cat['id']]
+                    if yolo_idx not in index_to_originals:
+                        index_to_originals[yolo_idx] = set()
+                    index_to_originals[yolo_idx].add((cat['id'], cat['name']))
         
         # Print sorted by YOLO index
         for yolo_idx in sorted(index_to_originals.keys()):
-            originals = index_to_originals[yolo_idx]
+            originals = sorted(index_to_originals[yolo_idx])  # Convert set to sorted list
             # Print first one normally
             print(f"{yolo_idx:7d} | {originals[0][0]:10d} | {originals[0][1]}")
             # Print any duplicates with same YOLO ID
