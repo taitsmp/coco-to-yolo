@@ -92,6 +92,9 @@ def process_split(
         if img_id in image_annotations:
             with open(label_path, 'w') as f:
                 for ann in image_annotations[img_id]:
+                    # Check if bbox exists in annotation
+                    if 'bbox' not in ann:
+                        continue  # Skip annotations without bbox
                     bbox = convert_bbox_coco_to_yolo(
                         ann['bbox'],
                         img_data['width'],
