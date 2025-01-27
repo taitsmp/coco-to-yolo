@@ -60,6 +60,7 @@ def process_split(
     total_images = len(coco_data['images'])
     processed_images = 0
     skipped_images = 0
+    negative_examples = 0  # New counter for negative examples
     
     # Create image id to info mapping
     image_info = {img['id']: img for img in coco_data['images']}
@@ -90,6 +91,7 @@ def process_split(
         
         # Convert annotations for this image
         if img_id in image_annotations:
+            has_valid_annotations = False  # Track if any valid annotations exist
             with open(label_path, 'w') as f:
                 for ann in image_annotations[img_id]:
                     # Check if bbox exists in annotation
@@ -103,9 +105,14 @@ def process_split(
                     # Convert category ID to zero-based index using the mapping
                     class_id = category_id_to_index[ann['category_id']]
                     f.write(f"{class_id} {' '.join(map(str, bbox))}\n")
+                    has_valid_annotations = True
+            
+            if not has_valid_annotations:
+                negative_examples += 1
         elif include_empty:
             # Create empty label file for images with no annotations
             label_path.touch()
+            negative_examples += 1
         
         processed_images += 1
     
@@ -114,6 +121,8 @@ def process_split(
     print(f"  Successfully processed: {processed_images}")
     if skipped_images > 0:
         print(f"  Skipped (images not found): {skipped_images}")
+    if include_empty:
+        print(f"  Negative examples (empty labels): {negative_examples}")
     
     # Print category ID mapping for user reference
     print("\nCategory ID mapping (original -> YOLO):")
