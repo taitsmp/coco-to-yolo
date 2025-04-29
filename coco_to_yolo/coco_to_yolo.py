@@ -27,6 +27,21 @@ def convert_bbox_coco_to_yolo(bbox: List[float], img_width: int, img_height: int
     
     return [x_center, y_center, width, height]
 
+def convert_segmentation_coco_to_yolo(segmentation: List[float], img_width: int, img_height: int) -> List[float]:
+    """
+    Convert COCO segmentation polygon coordinates to YOLO format (normalized)
+    """
+    # COCO segmentation is [x1,y1,x2,y2,...] format
+    normalized = []
+    for i, coord in enumerate(segmentation):
+        # Normalize x coordinates
+        if i % 2 == 0:
+            normalized.append(coord / img_width)
+        # Normalize y coordinates
+        else:
+            normalized.append(coord / img_height)
+    return normalized
+
 def process_split(
     coco_file: Path,
     output_dir: Path,
@@ -34,7 +49,8 @@ def process_split(
     source_dir: Path,
     dir_name: str,
     category_id_to_index: Dict[int, int],
-    include_empty: bool = True
+    include_empty: bool = True,
+    is_segmentation: bool = False
 ) -> Optional[List[Dict]]:
     """
     Process a single data split (train/val/test)
@@ -97,14 +113,39 @@ def process_split(
                     # Check if bbox exists in annotation
                     if 'bbox' not in ann:
                         continue  # Skip annotations without bbox
+                    
+                    # For segmentation, also check if segmentation exists
+                    if is_segmentation and 'segmentation' not in ann:
+                        continue  # Skip annotations without segmentation
+                    
                     bbox = convert_bbox_coco_to_yolo(
                         ann['bbox'],
                         img_data['width'],
                         img_data['height']
                     )
+                    
                     # Convert category ID to zero-based index using the mapping
                     class_id = category_id_to_index[ann['category_id']]
-                    f.write(f"{class_id} {' '.join(map(str, bbox))}\n")
+                    
+                    if is_segmentation:
+                        # Get the first polygon if segmentation is a list of polygons
+                        seg_points = ann['segmentation'][0] if isinstance(ann['segmentation'], list) else ann['segmentation']
+                        
+                        # Convert segmentation points
+                        normalized_seg = convert_segmentation_coco_to_yolo(
+                            seg_points,
+                            img_data['width'],
+                            img_data['height']
+                        )
+                        
+                        # Write in YOLO segmentation format:
+                        # <class> <x_center> <y_center> <width> <height> <x1> <y1> <x2> <y2> ...
+                        f.write(f"{class_id} {' '.join(map(str, bbox + normalized_seg))}\n")
+                    else:
+                        # Write in YOLO detection format:
+                        # <class> <x_center> <y_center> <width> <height>
+                        f.write(f"{class_id} {' '.join(map(str, bbox))}\n")
+                    
                     has_valid_annotations = True
             
             if not has_valid_annotations:
@@ -276,6 +317,8 @@ def main():
                       help='Base directory for images. Will be prepended to image paths from COCO json')
     parser.add_argument('--classification', action='store_true', default=False,
                       help='Process dataset for classification instead of object detection')
+    parser.add_argument('--segmentation', action='store_true', default=False,
+                      help='Process dataset for segmentation instead of object detection')
     parser.add_argument('--train-dir-name', type=str, default='train',
                       help='Name of the training directory (default: train)')
     parser.add_argument('--val-dir-name', type=str, default='val',
@@ -291,10 +334,14 @@ def main():
     print(f"\nInput directory: {args.input_dir}")
     print(f"Output directory: {args.output_dir}")
     print(f"Images directory: {image_base_dir}")
-    print(f"Mode: {'Classification' if args.classification else 'Object Detection'}")
+    print(f"Mode: {'Classification' if args.classification else 'Segmentation' if args.segmentation else 'Object Detection'}")
     
     if args.classification and args.include_data_yaml:
         print("Warning: --include-data-yaml is ignored in classification mode as YOLOv8 classification does not use data.yaml")
+    
+    if args.classification and args.segmentation:
+        print("Error: Cannot use both --classification and --segmentation flags")
+        return
     
     # Verify input files exist
     train_file = args.input_dir / 'train.json'
@@ -347,7 +394,8 @@ def main():
                 image_base_dir,
                 dir_name,
                 category_id_to_index,
-                include_empty=args.include_empty
+                include_empty=args.include_empty,
+                is_segmentation=args.segmentation
             )
     
     if args.include_data_yaml and categories and not args.classification:
