@@ -19,11 +19,11 @@ def convert_bbox_coco_to_yolo(bbox: List[float], img_width: int, img_height: int
     x_center = x_min + width / 2
     y_center = y_min + height / 2
     
-    # Normalize coordinates
-    x_center /= img_width
-    y_center /= img_height
-    width /= img_width
-    height /= img_height
+    # Normalize coordinates and clamp between 0 and 1
+    x_center = min(max(x_center / img_width, 0.0), 1.0)
+    y_center = min(max(y_center / img_height, 0.0), 1.0)
+    width = min(max(width / img_width, 0.0), 1.0)
+    height = min(max(height / img_height, 0.0), 1.0)
     
     return [x_center, y_center, width, height]
 
@@ -36,10 +36,10 @@ def convert_segmentation_coco_to_yolo(segmentation: List[float], img_width: int,
     for i, coord in enumerate(segmentation):
         # Normalize x coordinates
         if i % 2 == 0:
-            normalized.append(coord / img_width)
+            normalized.append(min(max(coord / img_width, 0.0), 1.0))  # Clamp between 0 and 1
         # Normalize y coordinates
         else:
-            normalized.append(coord / img_height)
+            normalized.append(min(max(coord / img_height, 0.0), 1.0))  # Clamp between 0 and 1
     return normalized
 
 def process_split(
