@@ -139,8 +139,8 @@ def process_split(
                         )
                         
                         # Write in YOLO segmentation format:
-                        # <class> <x_center> <y_center> <width> <height> <x1> <y1> <x2> <y2> ...
-                        f.write(f"{class_id} {' '.join(map(str, bbox + normalized_seg))}\n")
+                        # <class> <x1> <y1> <x2> <y2> ...
+                        f.write(f"{class_id} {' '.join(map(str, normalized_seg))}\n")
                     else:
                         # Write in YOLO detection format:
                         # <class> <x_center> <y_center> <width> <height>
